@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import DataLoader
-from models.new_convert_code_1 import SpikeModule, SpikeModel
+#from models.new_convert_code_1 import SpikeModule, SpikeModel
 import numpy as np
 from typing import Callable, Tuple, List, Union, Dict, cast
 import torch.nn as nn
@@ -54,11 +54,13 @@ def quantile(tensor: torch.Tensor, p: float):
 
 
 @torch.no_grad()
-def find_activation_percentile (train_loader: torch.utils.data.DataLoader,
-                           model: SpikeModel,
-                           percentile: Union[float, None] = None,
-                           percentile2:Union[float, None] = None,
-                           iter:int = 30):
+def find_activation_percentile (
+        train_loader: torch.utils.data.DataLoader,
+        model: SpikeModel,
+        percentile: Union[float, None] = None,
+        percentile2:Union[float, None] = None,
+        iter:int = 30
+):
     print('test')
     # model.eval()
     for name, module in model.named_modules():

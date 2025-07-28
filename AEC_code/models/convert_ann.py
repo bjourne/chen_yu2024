@@ -7,7 +7,6 @@ import torch.nn.functional as F
 from typing import Callable, Tuple, List, Union, Dict, cast
 from models.utils import StraightThrough, AvgPoolConv
 
-#权重归一化
 def ceil_ste(x):
     return (x.ceil() - x).detach() + x
 
@@ -60,8 +59,8 @@ class SpikeModule(nn.Module):
         # u_d = self.en_decoding(u)
         return self.relu(self.fwd_func(input, self.org_weight, self.org_bias, **self.fwd_kwargs))
         # return u_d
-class SpikeModel(nn.Module):
 
+class SpikeModel(nn.Module):
     def __init__(self, model: nn.Module, sim_length: int, specials: dict = {}):
         super().__init__()
         self.model = model
@@ -74,7 +73,7 @@ class SpikeModel(nn.Module):
     def spike_module_refactor(self, module: nn.Module, sim_length: int, prev_module=None):
         """
         Recursively replace the normal conv2d to SpikeConv2d
-        :param module: nn.Module with nn.Conv2d or nn.Linear in its children
+        :param module: Module with Conv2d or nn.Linear in its children
         :param sim_length: simulation length, aka total time steps
         :param prev_module: use this to add relu to prev_spikemodule
         """
@@ -97,37 +96,13 @@ class SpikeModel(nn.Module):
                 setattr(module, name, SpikeModule(sim_length=sim_length, conv=immediate_child_module))
                 getattr(module, name).add_module('relu', relu)
             else:
-                prev_module = self.spike_module_refactor(immediate_child_module, sim_length=sim_length, prev_module=prev_module)
+                prev_module = self.spike_module_refactor(
+                    immediate_child_module,
+                    sim_length=sim_length,
+                    prev_module=prev_module
+                )
 
         return prev_module
 
     def forward(self, input):
-        out = self.model(input)
-        return out
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        return self.model(input)

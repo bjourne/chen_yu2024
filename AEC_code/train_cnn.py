@@ -1,21 +1,23 @@
-#This code is for training ANN
-
 import torch
 import random
 import numpy as np
 import os
 import copy
 import time
-from torch.utils.data import DataLoader
+
 import torch.nn as nn
 import torchvision.transforms as transforms
+
+from torch.nn import *
+from torch.optim import SGD
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10, CIFAR100
+from torchvision.transforms import *
 from data.autoaugment import CIFAR10Policy, Cutout
 from models.vgg import VGG
-from models.new_convert_code_1 import SpikeModel,SpikeModule
 from models.fold_bn import search_fold_and_remove_bn
-from find_data_distribute import find_activation_percentile
-#删除了workers=4
+
 def build_data(dpath: str, batch_size=128, cutout=False,  use_cifar10=True, auto_aug=False):
 
     aug = [transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip()]
@@ -29,11 +31,11 @@ def build_data(dpath: str, batch_size=128, cutout=False,  use_cifar10=True, auto
 
     if use_cifar10:
         aug.append(
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)))
-        transform_train = transforms.Compose(aug)
-        transform_test = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(
+            Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)))
+        transform_train = Compose(aug)
+        transform_test = Compose([
+            ToTensor(),
+            Normalize(
                 (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
         ])
         train_dataset = CIFAR10(root=dpath, train=True, download=True, transform=transform_train)
@@ -41,13 +43,13 @@ def build_data(dpath: str, batch_size=128, cutout=False,  use_cifar10=True, auto
 
     else:
         aug.append(
-            transforms.Normalize(
+            Normalize(
                 (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
         )
-        transform_train = transforms.Compose(aug)
-        transform_test = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(
+        transform_train = Compose(aug)
+        transform_test = Compose([
+            ToTensor(),
+            Normalize(
                 (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
         ])
         train_dataset = CIFAR100(root=dpath, train=True, download=True, transform=transform_train)
@@ -61,7 +63,6 @@ def build_data(dpath: str, batch_size=128, cutout=False,  use_cifar10=True, auto
 
     return train_loader, val_loader
 
-#网络参数默认值
 batch_size = 32
 learning_rate = 1e-2
 epochs = 300
@@ -78,7 +79,12 @@ if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_epochs = epochs
     use_cifar10 = True
-    train_loader, test_loader = build_data(dpath=dpath, cutout=True, use_cifar10=use_cifar10, auto_aug=True)
+    train_loader, test_loader = build_data(
+        dpath=dpath,
+        cutout=True,
+        use_cifar10=use_cifar10,
+        auto_aug=True
+    )
     best_acc = 0
     best_epoch = 0
     use_bn = usebn
@@ -89,23 +95,23 @@ if __name__ == '__main__':
 
     ann = VGG('VGG16', use_bn=use_bn, num_class=10 if use_cifar10 else 100)
     ann.to(device)
-    criterion = nn.CrossEntropyLoss().to(device)
+    criterion = CrossEntropyLoss().to(device)
     # build optimizer
-    optimizer = torch.optim.SGD(ann.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4) if use_bn else \
-        torch.optim.SGD(ann.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, eta_min=0, T_max=num_epochs)
+    optimizer = SGD(ann.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4) if use_bn else \
+        SGD(ann.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
+    scheduler = CosineAnnealingLR(optimizer, eta_min=0, T_max=num_epochs)
 
     # train
     for epoch in range(num_epochs):
         running_loss = 0
         start_time = time.time()
         ann.train()
-        for i, (images, labels) in enumerate(train_loader):
+        for i, (xs, ys) in enumerate(train_loader):
             optimizer.zero_grad()
-            labels = labels.to(device)
-            images = images.to(device)
-            outputs = ann(images)
-            loss = criterion(outputs, labels)
+            ys = ys.to(device)
+            xs = xs.to(device)
+            yhats = ann(xs)
+            loss = criterion(yhats, ys)
             running_loss += loss.item()
             loss.backward()
             optimizer.step()
@@ -124,9 +130,9 @@ if __name__ == '__main__':
             for batch_idx, (inputs, targets) in enumerate(test_loader):
                 inputs = inputs.to(device)
                 targets = targets.to(device)
-                outputs = ann(inputs)
-                loss = criterion(outputs, targets)
-                _, predicted = outputs.cpu().max(1)
+                yhats = ann(inputs)
+                loss = criterion(yhats, targets)
+                _, predicted = yhats.cpu().max(1)
                 total += float(targets.size(0))
                 correct += float(predicted.eq(targets.cpu()).sum().item())
                 if batch_idx % 100 == 0:
@@ -138,6 +144,10 @@ if __name__ == '__main__':
         if best_acc < acc:
             best_acc = acc
             best_epoch = epoch + 1
-            torch.save(ann.state_dict(), model_save_name,_use_new_zipfile_serialization=False)
+            torch.save(
+                ann.state_dict(),
+                model_save_name,
+                _use_new_zipfile_serialization=False
+            )
         print('best_acc is: ', best_acc, ' find in epoch: ', best_epoch)
         print('\n\n')
