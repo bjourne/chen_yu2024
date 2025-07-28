@@ -6,7 +6,11 @@ import time
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import torchvision.transforms as transforms
+
+from torch.optim import Adam
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torchvision.datasets import CIFAR10, CIFAR100
+from torchvision.transforms import *
 from data.autoaugment import CIFAR10Policy, Cutout
 from models.vgg import VGG
 from models.new_convert_code_2 import SpikeModel,SpikeModule
@@ -16,26 +20,24 @@ from models.fold_bn import search_fold_and_remove_bn
 from data_base_Norm import data_norm_model
 from models.utils import En_Decoding2
 
-#Data set processing and loading
-
 def build_data(dpath: str, batch_size=256, cutout=False,  use_cifar10=True, auto_aug=False):
 
-    aug = [transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip()]
+    aug = [RandomCrop(32, padding=4), RandomHorizontalFlip()]
     if auto_aug:
         aug.append(CIFAR10Policy())
 
-    aug.append(transforms.ToTensor())
+    aug.append(ToTensor())
 
     if cutout:
         aug.append(Cutout(n_holes=1, length=16))
 
     if use_cifar10:
         aug.append(
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)))
-        transform_train = transforms.Compose(aug)
-        transform_test = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(
+            Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)))
+        transform_train = Compose(aug)
+        transform_test = Compose([
+            ToTensor(),
+            Normalize(
                 (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
         ])
         train_dataset = CIFAR10(root=dpath, train=True, download=True, transform=transform_train)
@@ -124,10 +126,8 @@ if __name__ == '__main__':
 
     criterion = nn.CrossEntropyLoss().to(device)
 
-
-    optimizer =torch.optim.Adam(snn.parameters(),lr=0.00001,betas=(0.9,0.999),eps=1e-10,weight_decay=0)
-
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, eta_min=0, T_max=epochs)
+    optimizer = Adam(snn.parameters(),lr=0.00001,betas=(0.9,0.999),eps=1e-10,weight_decay=0)
+    scheduler = CosineAnnealingLR(optimizer, eta_min=0, T_max=epochs)
 
     #train
     for epoch in range(num_epochs):
@@ -145,10 +145,6 @@ if __name__ == '__main__':
 
             outputs = snn(images)
             loss = criterion(outputs, labels)
-
-            #The loss function after adding the penalty term
-            # loss =criterion(outputs, labels)+regularization1(snn,0.01)-regularization(snn,0.1)
-
 
             running_loss += loss.item()
             loss.backward()
@@ -186,4 +182,3 @@ if __name__ == '__main__':
             best_epoch = epoch + 1
             torch.save(snn.state_dict(), 'snn1015.pth',_use_new_zipfile_serialization=False)
         print('best_acc is: ', best_acc, ' find in epoch: ', best_epoch)
-

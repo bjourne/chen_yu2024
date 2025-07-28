@@ -2,12 +2,11 @@ import numpy as np
 import torch.nn as nn
 import torch
 import pickle as pick
+
 def ceil_ste(x):
     return (x.ceil() - x).detach() + x
-class StraightThrough(nn.Module):
-    """
 
-    """
+class StraightThrough(nn.Module):
     def __init__(self, channel_num: int = 1):
         super().__init__()
 
@@ -78,7 +77,7 @@ class En_Decoding2(nn.Module):
         # z = torch.nonzero(u_d_2 > 0)
         # self.num2 = z.shape[0]
 
-        return u_final,self.num,self.num2
+        return u_final, self.num, self.num2
 
     def forward(self, input: torch.Tensor):
         u_d,t,t1 = self.en_decoding(input)
